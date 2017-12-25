@@ -10,7 +10,7 @@ import Cocoa
 
 class ParseOperation: Operation {
     private let sourcePath: String
-    var result = [String : Set<String>]()
+    var result = [String : Set<ParsingItem>]()
 
     init(sourcePath: String) {
         self.sourcePath = sourcePath
@@ -44,10 +44,12 @@ class ParseOperation: Operation {
         let funcMark = "func "
         
         var currentClassName: String?
-        var currentSet = Set<String>()
+        var currentProtocols: [String] = []
+        var currentSet = Set<ParsingItem>()
         for line in astLines {
             if line.hasPrefix(classMark), currentClassName == nil {
                 currentClassName = String(line.dropFirst(classMark.count))
+                currentProtocols = currentClassName?.components(separatedBy: ", ").dropFirst().map { $0.components(separatedBy: " ").first ?? "" } ?? []
                 currentClassName = currentClassName?.components(separatedBy: " ").first
                 
                 currentSet = result[currentClassName ?? ""] ?? Set()
@@ -63,7 +65,9 @@ class ParseOperation: Operation {
                 var testMethodName = String(line.dropFirst(funcMark.count))
                 testMethodName = testMethodName.replacingOccurrences(of: "()", with: "")
                 
-                currentSet.insert(testMethodName)
+                let parsingItem = ParsingItem(methodName: testMethodName, conformedProtocols: currentProtocols)
+                
+                currentSet.insert(parsingItem)
             } else if line == "}" {
                 if currentSet.count > 0 {
                     result[currentClassName!] = currentSet
@@ -71,5 +75,23 @@ class ParseOperation: Operation {
                 currentClassName = nil
             }
         }
+    }
+}
+
+class ParsingItem: Hashable {
+    let methodName: String
+    let conformedProtocols: [String]
+    
+    var hashValue: Int {
+        return methodName.hashValue
+    }
+    
+    static func ==(lhs: ParsingItem, rhs: ParsingItem) -> Bool {
+        return lhs.methodName == rhs.methodName
+    }
+    
+    init(methodName: String, conformedProtocols: [String]) {
+        self.methodName = methodName
+        self.conformedProtocols = conformedProtocols
     }
 }

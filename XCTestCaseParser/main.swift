@@ -13,9 +13,11 @@ let synchQueue = DispatchQueue(label: "synchQueue")
 let arguments = CommandLine.arguments.dropFirst()
 
 if arguments.count == 0 {
-    print("usage: testlistextractor source_file[s] (wildcards accepted).\n\nNote: Only swift files are supported!")
+    print("usage: testlistextractor [OPTIONS] source_file[s] (wildcards accepted).\n\nNote: Only swift files are supported!")
+    print("\t--extract_protocols\treturn protocols that the containing class confirms to")
     exit(-1)
 }
+let extract_protocols = (arguments.first == "--extract_protocols")
 
 let skipItems = Set([".", "..", ""])
 
@@ -44,7 +46,14 @@ for file in files {
     parseOperation.completionBlock = { [unowned parseOperation] in
         synchQueue.sync {
             for (k, v) in parseOperation.result {
-                result.append(contentsOf: v.map { k + "/" + $0})
+                if extract_protocols {
+                    v.forEach { assert($0.conformedProtocols.count > 0, "Failed to get conformedProtocols") }
+                    let testMethods = v.map { k + "/" + $0.methodName + "|" + $0.conformedProtocols.joined(separator: ",") }
+                    result.append(contentsOf: testMethods)
+                } else {
+                    let testMethods = v.map { k + "/" + $0.methodName }
+                    result.append(contentsOf: testMethods)
+                }
             }
         }
         sem.signal()
