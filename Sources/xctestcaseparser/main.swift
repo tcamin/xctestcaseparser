@@ -7,28 +7,43 @@
 //
 
 import Foundation
+import Utility
+import Basic
+
+// The first argument is always the executable, drop it
+let arguments = Array(ProcessInfo.processInfo.arguments.dropFirst())
+
+let parser = ArgumentParser(usage: "<options> [files]", overview: "Extract tests from Swift files")
+
+let extractProtocolArgument = parser.add(option: "--extract_protocols", kind: Bool.self, usage: "Return protocols that the containing class conforms to")
+let excludeSourceFilesArguments = parser.add(option: "--exclude", shortName: "-x", kind: [String].self, usage: "Files to skip from parsing (wildcards accepted)")
+let sourceFilesArguments = parser.add(positional: "files", kind: [String].self, usage: "Files to parse (wildcards accepted)")
+
+var parsedArguments: ArgumentParser.Result?
+
+do {
+    parsedArguments = try parser.parse(arguments)
+}
+catch let error as ArgumentParserError {
+    parser.printUsage(on: stdoutStream)
+    print("\n" + error.description)
+
+    exit(-1)
+}
+catch let error {
+    parser.printUsage(on: stdoutStream)
+    print("\n" + error.localizedDescription)
+        
+    exit(-1)
+}
 
 let synchQueue = DispatchQueue(label: "synchQueue")
 
-let arguments = CommandLine.arguments.dropFirst()
+let includeParameter = parsedArguments?.get(sourceFilesArguments)?.map { "-name '\($0)'" }.joined(separator: " -o ") ?? ""
+let excludeParameter = parsedArguments?.get(excludeSourceFilesArguments)?.map { "! -name '\($0)'" }.joined(separator: " ") ?? ""
+let extractProtocols = parsedArguments?.get(extractProtocolArgument) ?? false
 
-if arguments.count == 0 {
-    print("usage: testlistextractor [OPTIONS] source_file[s] (wildcards accepted).\n\nNote: Only swift files are supported!")
-    print("\t--extract_protocols\treturn protocols that the containing class confirms to")
-    exit(-1)
-}
-let extract_protocols = (arguments.first == "--extract_protocols")
-
-let skipItems = Set([".", "..", ""])
-
-var files = Set<String>()
-// arguments should either be filenames or bash wildcards
-for argument in arguments {
-    var partialFiles = Set("find . -name '\(argument)'".shellExecute().components(separatedBy: "\n"))
-    
-    partialFiles = partialFiles.subtracting(skipItems)
-    files = files.union(partialFiles)
-}
+var files = Set("find . \(includeParameter) \(excludeParameter)".shellExecute().components(separatedBy: "\n"))
 
 files = files.filter { $0.hasSuffix(".swift") }
 
@@ -46,7 +61,7 @@ for file in files {
     parseOperation.completionBlock = { [unowned parseOperation] in
         synchQueue.sync {
             for (k, v) in parseOperation.result {
-                if extract_protocols {
+                if extractProtocols {
                     v.forEach { assert($0.conformedProtocols.count > 0, "Failed to get conformedProtocols") }
                     let testMethods = v.map { k + "/" + $0.methodName + "|" + $0.conformedProtocols.joined(separator: ",") }
                     result.append(contentsOf: testMethods)
