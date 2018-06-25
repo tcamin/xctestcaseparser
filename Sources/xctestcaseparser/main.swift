@@ -39,11 +39,14 @@ catch let error {
 
 let synchQueue = DispatchQueue(label: "synchQueue")
 
-let excludeParameter = parsedArguments?.get(excludeSourceFilesArguments)?.map { "! -name '\($0)'" }.joined(separator: " ") ?? ""
+let includeParameter = parsedArguments?.get(sourceFilesArguments)?.map { "-iname '\($0)'" }.joined(separator: " -o ") ?? ""
+let excludeParameter = parsedArguments?.get(excludeSourceFilesArguments)?.map { "! -iname '\($0)'" }.joined(separator: " ") ?? ""
 let extractProtocols = parsedArguments?.get(extractProtocolArgument) ?? false
-let includeParameter = parsedArguments?.get(sourceFilesArguments)?.map { "-name '\($0)'" }.joined(separator: " -o ") ?? ""
 
-var files = Set("find . \(includeParameter) \(excludeParameter)".shellExecute().components(separatedBy: "\n"))
+let findInclude = "-type f \\( \(includeParameter) \\)"
+let findExclude = excludeParameter.count > 0 ? "-type f \\( \(excludeParameter) \\)" : ""
+
+var files = Set("find . \(findInclude) \(findExclude)".shellExecute().components(separatedBy: "\n"))
 
 files = files.filter { $0.hasSuffix(".swift") }
 
