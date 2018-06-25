@@ -13,7 +13,7 @@ import Basic
 // The first argument is always the executable, drop it
 let arguments = Array(ProcessInfo.processInfo.arguments.dropFirst())
 
-let parser = ArgumentParser(usage: "<options> [files]", overview: "Extract tests from Swift files")
+let parser = ArgumentParser(usage: "[files] <options>", overview: "Extract tests from Swift files")
 
 let extractProtocolArgument = parser.add(option: "--extract_protocols", kind: Bool.self, usage: "Return protocols that the containing class conforms to")
 let excludeSourceFilesArguments = parser.add(option: "--exclude", shortName: "-x", kind: [String].self, usage: "Files to skip from parsing (wildcards accepted)")
@@ -39,9 +39,9 @@ catch let error {
 
 let synchQueue = DispatchQueue(label: "synchQueue")
 
-let includeParameter = parsedArguments?.get(sourceFilesArguments)?.map { "-name '\($0)'" }.joined(separator: " -o ") ?? ""
 let excludeParameter = parsedArguments?.get(excludeSourceFilesArguments)?.map { "! -name '\($0)'" }.joined(separator: " ") ?? ""
 let extractProtocols = parsedArguments?.get(extractProtocolArgument) ?? false
+let includeParameter = parsedArguments?.get(sourceFilesArguments)?.map { "-name '\($0)'" }.joined(separator: " -o ") ?? ""
 
 var files = Set("find . \(includeParameter) \(excludeParameter)".shellExecute().components(separatedBy: "\n"))
 
